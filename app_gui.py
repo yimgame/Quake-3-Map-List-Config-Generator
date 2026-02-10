@@ -164,14 +164,21 @@ class ConfigGenerator:
                 'timelimit': '05'
             }
         
+        excluded_maps = default_params.pop('excluded_maps', [])
+        
         lines = []
         lines.append("# the first map will be the one rotated to if the server is idle")
         lines.append('# entries are "mapname [minplayers] [maxplayers] [caplimit] [timelimit]"')
+        lines.append('# entries with minplayers -1 are "banned" and can\'t be voted in even with map_restrict 0')
         lines.append("")
         
         for map_info in maps:
             map_name = map_info.get('map', 'unknown')
-            line = f"{map_name} {default_params['minplayers']} {default_params['maxplayers']} "
+            # Si el mapa está excluido, usar minplayers -1
+            if map_name in excluded_maps:
+                line = f"{map_name} -1 {default_params['maxplayers']} "
+            else:
+                line = f"{map_name} {default_params['minplayers']} {default_params['maxplayers']} "
             line += f"{default_params['caplimit']} {default_params['timelimit']}"
             lines.append(line)
         
@@ -188,14 +195,21 @@ class ConfigGenerator:
                 'timelimit': '20'
             }
         
+        excluded_maps = default_params.pop('excluded_maps', [])
+        
         lines = []
         lines.append("# the first map will be the one rotated to if the server is idle")
         lines.append('# entries are "mapname [minplayers] [maxplayers] [fraglimit] [timelimit]"')
+        lines.append('# entries with minplayers -1 are "banned" and can\'t be voted in even with map_restrict 0')
         lines.append("")
         
         for map_info in maps:
             map_name = map_info.get('map', 'unknown')
-            line = f"{map_name} {default_params['minplayers']} {default_params['maxplayers']} "
+            # Si el mapa está excluido, usar minplayers -1
+            if map_name in excluded_maps:
+                line = f"{map_name} -1 {default_params['maxplayers']} "
+            else:
+                line = f"{map_name} {default_params['minplayers']} {default_params['maxplayers']} "
             line += f"{default_params['fraglimit']} {default_params['timelimit']}"
             lines.append(line)
         
@@ -212,14 +226,21 @@ class ConfigGenerator:
                 'timelimit': '10'
             }
         
+        excluded_maps = default_params.pop('excluded_maps', [])
+        
         lines = []
         lines.append("# the first map will be the one rotated to if the server is idle")
         lines.append('# entries are "mapname [minplayers] [maxplayers] [fraglimit] [timelimit]"')
+        lines.append('# entries with minplayers -1 are "banned" and can\'t be voted in even with map_restrict 0')
         lines.append("")
         
         for map_info in maps:
             map_name = map_info.get('map', 'unknown')
-            line = f"{map_name} {default_params['minplayers']} {default_params['maxplayers']} "
+            # Si el mapa está excluido, usar minplayers -1
+            if map_name in excluded_maps:
+                line = f"{map_name} -1 {default_params['maxplayers']} "
+            else:
+                line = f"{map_name} {default_params['minplayers']} {default_params['maxplayers']} "
             line += f"{default_params['fraglimit']} {default_params['timelimit']}"
             lines.append(line)
         
@@ -237,14 +258,21 @@ class ConfigGenerator:
                 'arena': '4'
             }
         
+        excluded_maps = default_params.pop('excluded_maps', [])
+        
         lines = []
         lines.append("# the first map will be the one rotated to if the server is idle")
         lines.append('# format: "mapname [minplayers] [maxplayers] [roundlimit] [timelimit] [arena]"')
+        lines.append('# entries with minplayers -1 are "banned" and can\'t be voted in even with map_restrict 0')
         lines.append("")
         
         for map_info in maps:
             map_name = map_info.get('map', 'unknown')
-            line = f"{map_name}\t\t{default_params['minplayers']}\t{default_params['maxplayers']}\t"
+            # Si el mapa está excluido, usar minplayers -1
+            if map_name in excluded_maps:
+                line = f"{map_name}\t\t-1\t{default_params['maxplayers']}\t"
+            else:
+                line = f"{map_name}\t\t{default_params['minplayers']}\t{default_params['maxplayers']}\t"
             line += f"{default_params['roundlimit']}\t{default_params['timelimit']}\t{default_params['arena']}"
             lines.append(line)
         

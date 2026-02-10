@@ -1,5 +1,51 @@
 # Q3 Map Config Generator - Changelog
 
+## [v2.1] - 2026-02-10 - Sistema de Exclusión de Mapas con Checkboxes
+
+### ✨ Nuevas Características
+- **Checkboxes individuales por mapa**: Cada mapa ahora tiene un checkbox para incluirlo/excluirlo
+- **Seleccionar/Deseleccionar todo**: Checkbox maestro en cada tarjeta para control rápido
+- **Mapas excluidos con minplayers -1**: Los mapas desmarcados se exportan con `minplayers -1` (baneados)
+- **Indicador visual de exclusión**: Mapas desmarcados se muestran con opacidad reducida
+- **Contador dinámico**: Muestra cantidad de mapas seleccionados vs excluidos en tiempo real
+- **Estado intermedio**: Checkbox maestro muestra estado intermedio cuando hay selección parcial
+
+### 🎯 Sistema de Banneo de Mapas
+Los mapas desmarcados se generan con `minplayers -1` siguiendo la convención de CPMA:
+```
+# entries with minplayers -1 are "banned"
+# and can't be voted in even with map_restrict 0
+```
+
+**Casos de uso:**
+- Excluir mapas de mala calidad incluidos en pk3 con otros buenos
+- Disable mapas que reclaman soportar un modo pero no lo hacen (ej. CTF sin flags)
+- Gestión flexible sin necesidad de borrar archivos pk3
+
+### 🎨 Mejoras UI/UX
+- Estructura de mapas rediseñada con layout flex
+- Mapas clicables: hacer click en el nombre también marca/desmarca
+- Transiciones suaves en hover y cambio de estado
+- Mejor contraste visual entre mapas activos y excluidos
+- Stats actualizados automáticamente al cambiar selección
+
+### 🔧 Mejoras Backend
+- Todas las funciones generadoras actualizadas (CTF, FFA, Tourney, RA3)
+- Parámetro `excluded_maps` en configuración
+- Comentarios explicativos en archivos generados
+- Soporte completo para formatos: fraglimit, caplimit, roundlimit
+
+### 📝 Formato de Salida
+**Ejemplo de archivo generado:**
+```
+# entries with minplayers -1 are "banned" and can't be voted in
+q3dm1       02  16  30  20
+q3dm2       -1  16  30  20   # EXCLUIDO
+q3dm3       02  16  30  20
+```
+
+---
+
 ## [v2.0] - 2026-02-10 - Sistema Dinámico de Detección de Modos
 
 ### ✨ Nuevas Características

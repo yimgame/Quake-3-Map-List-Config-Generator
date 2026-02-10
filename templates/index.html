@@ -234,6 +234,39 @@
             border-radius: 5px;
         }
 
+        .map-select-all {
+            padding: 12px 15px;
+            margin-bottom: 15px;
+            background: rgba(255, 102, 0, 0.1);
+            border-radius: 5px;
+            border: 1px solid #ff6600;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+            user-select: none;
+        }
+
+        .map-select-all:hover {
+            background: rgba(255, 102, 0, 0.2);
+        }
+
+        .map-select-all input[type="checkbox"] {
+            cursor: pointer;
+            width: 18px;
+            height: 18px;
+            accent-color: #ff6600;
+        }
+
+        .map-select-all label {
+            cursor: pointer;
+            margin: 0;
+            color: #ff6600;
+            font-weight: bold;
+            text-transform: none;
+        }
+
         .map-item {
             padding: 10px;
             margin-bottom: 8px;
@@ -241,6 +274,36 @@
             border-radius: 5px;
             border-left: 3px solid #ff6600;
             box-sizing: border-box;
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            transition: all 0.3s;
+        }
+
+        .map-item:hover {
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        .map-item.excluded {
+            opacity: 0.5;
+            border-left-color: #666;
+        }
+
+        .map-checkbox {
+            flex-shrink: 0;
+            margin-top: 3px;
+        }
+
+        .map-checkbox input[type="checkbox"] {
+            cursor: pointer;
+            width: 18px;
+            height: 18px;
+            accent-color: #ff6600;
+        }
+
+        .map-info {
+            flex: 1;
+            min-width: 0;
         }
 
         .map-name {
@@ -258,6 +321,14 @@
             color: #666;
             font-size: 0.8em;
             margin-top: 3px;
+        }
+
+        .map-stats {
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            color: #999;
+            font-size: 0.85em;
         }
 
         .actions {
@@ -823,17 +894,99 @@
                 <div id="${type}_message" class="message"></div>
 
                 <div class="map-list">
-                    ${maps.map(m => `
-                        <div class="map-item">
-                            <div class="map-name">${m.map}</div>
-                            ${m.longname ? `<div class="map-longname">${m.longname}</div>` : ''}
-                            <div class="map-source">📦 ${m.source_pk3}</div>
+                    <div class="map-select-all">
+                        <input type="checkbox" id="${type}_selectAll" checked onchange="toggleAllMaps('${type}')">
+                        <label for="${type}_selectAll">Seleccionar/Deseleccionar todos</label>
+                    </div>
+                    ${maps.map((m, idx) => `
+                        <div class="map-item" data-map-index="${idx}">
+                            <div class="map-checkbox">
+                                <input type="checkbox" 
+                                       id="${type}_map_${idx}" 
+                                       class="${type}-map-checkbox"
+                                       data-map-name="${m.map}"
+                                       checked 
+                                       onchange="updateMapSelection('${type}')">
+                            </div>
+                            <div class="map-info">
+                                <label for="${type}_map_${idx}" class="map-name" style="cursor: pointer;">${m.map}</label>
+                                ${m.longname ? `<div class="map-longname">${m.longname}</div>` : ''}
+                                <div class="map-source">📦 ${m.source_pk3}</div>
+                            </div>
                         </div>
                     `).join('')}
+                    <div class="map-stats" id="${type}_stats">
+                        <strong>${count}</strong> mapas seleccionados
+                    </div>
                 </div>
             `;
 
             return card;
+        }
+
+        function toggleAllMaps(type) {
+            const selectAllCheckbox = document.getElementById(`${type}_selectAll`);
+            const mapCheckboxes = document.querySelectorAll(`.${type}-map-checkbox`);
+            
+            mapCheckboxes.forEach(checkbox => {
+                checkbox.checked = selectAllCheckbox.checked;
+                const mapItem = checkbox.closest('.map-item');
+                if (!checkbox.checked) {
+                    mapItem.classList.add('excluded');
+                } else {
+                    mapItem.classList.remove('excluded');
+                }
+            });
+            
+            updateMapSelection(type);
+        }
+
+        function updateMapSelection(type) {
+            const mapCheckboxes = document.querySelectorAll(`.${type}-map-checkbox`);
+            const selectAllCheckbox = document.getElementById(`${type}_selectAll`);
+            const statsElement = document.getElementById(`${type}_stats`);
+            
+            let selectedCount = 0;
+            let totalCount = 0;
+            
+            mapCheckboxes.forEach(checkbox => {
+                totalCount++;
+                const mapItem = checkbox.closest('.map-item');
+                
+                if (checkbox.checked) {
+                    selectedCount++;
+                    mapItem.classList.remove('excluded');
+                } else {
+                    mapItem.classList.add('excluded');
+                }
+            });
+            
+            // Actualizar checkbox de "seleccionar todo"
+            selectAllCheckbox.checked = selectedCount === totalCount;
+            selectAllCheckbox.indeterminate = selectedCount > 0 && selectedCount < totalCount;
+            
+            // Actualizar stats
+            if (statsElement) {
+                const excludedCount = totalCount - selectedCount;
+                statsElement.innerHTML = `<strong>${selectedCount}</strong> mapas seleccionados${excludedCount > 0 ? ` <span style="color: #ff6600;">(${excludedCount} excluidos)</span>` : ''}`;
+            }
+        }
+
+        function getSelectedMaps(type) {
+            const mapCheckboxes = document.querySelectorAll(`.${type}-map-checkbox`);
+            const selectedMaps = [];
+            const excludedMaps = [];
+            
+            mapCheckboxes.forEach(checkbox => {
+                const mapName = checkbox.dataset.mapName;
+                if (checkbox.checked) {
+                    selectedMaps.push(mapName);
+                } else {
+                    excludedMaps.push(mapName);
+                }
+            });
+            
+            return { selected: selectedMaps, excluded: excludedMaps };
         }
 
         function getParams(type) {
@@ -851,6 +1004,10 @@
             if (isRA3) {
                 params.arena = document.getElementById(`${type}_arena`).value;
             }
+
+            // Agregar mapas seleccionados y excluidos
+            const mapSelection = getSelectedMaps(type);
+            params.excluded_maps = mapSelection.excluded;
 
             return params;
         }
