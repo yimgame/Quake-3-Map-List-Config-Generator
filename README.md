@@ -2,13 +2,18 @@
 
 > **Sistema Dinámico de Generación Automática** de archivos de configuración de mapas para Quake 3 Arena CPMA
 
+Sitio oficial de CPMA: https://playmorepromode.com/
+
+Maked with love by https://yimgame.github.io/
+
+
 [![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)](https://www.python.org/)
 [![Flask](https://img.shields.io/badge/Flask-3.1.2-green.svg)](https://flask.palletsprojects.com/)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 ## 🚀 Características Principales
 
-### ✨ Versión 2.0 - Sistema Dinámico
+### ✨ Versión 2.1 - Sistema Dinámico
 - 🤖 **Auto-detección de modos de juego**: Detecta automáticamente modos nuevos sin configuración manual
 - 🎯 **Clasificación inteligente**: Identifica automáticamente si un modo usa `fraglimit`, `caplimit` o formato especial
 - 📊 **Stats dinámicos**: Muestra todos los modos encontrados, no solo una lista fija
@@ -25,6 +30,7 @@
 - 🪟 Ventana GUI nativa (no necesitas navegador)
 - 🔌 Detección automática de puerto disponible (5000-5009)
 - 🌐 Acceso por LAN con IP detectada automáticamente
+ - ☑️ Checkboxes por mapa para incluir/excluir; los excluidos se exportan con `minplayers -1` (banned) si no quieres jugarlo o esta mal seteado en el `.arena` (ej. CTF sin banderas)
 
 ### 🎲 Modos Soportados (+ Infinitos Más)
 
@@ -223,8 +229,10 @@ Este proyecto está bajo la Licencia MIT - ver el archivo [LICENSE](LICENSE) par
 
 ## ✨ Autor
 
-**Desarrollado con GitHub Copilot** (Claude Sonnet 4.5)  
+**Desarrollado con amor por GitHub Copilot** (Claude Sonnet 4.5)  
 🤖 AI-Powered Development for the Quake 3 Community
+
+Just coding 4 fun !!!
 
 ---
 

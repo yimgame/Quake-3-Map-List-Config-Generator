@@ -830,9 +830,24 @@
                 };
             }
 
-            for (const [type, maps] of Object.entries(mapsByType)) {
-                if (maps.length === 0) continue;
+            const priorityOrder = ['1v1', 'team', 'tdm', 'ctf'];
+            const typesToRender = Object.keys(mapsByType)
+                .filter(type => (mapsByType[type] || []).length > 0)
+                .sort((a, b) => {
+                    const aIndex = priorityOrder.indexOf(a);
+                    const bIndex = priorityOrder.indexOf(b);
 
+                    if (aIndex !== -1 || bIndex !== -1) {
+                        if (aIndex === -1) return 1;
+                        if (bIndex === -1) return -1;
+                        return aIndex - bIndex;
+                    }
+
+                    return a.localeCompare(b);
+                });
+
+            for (const type of typesToRender) {
+                const maps = mapsByType[type];
                 const config = typeConfigs[type] || getDefaultConfigForType(type);
                 const card = createTypeCard(type, maps, config, counts[type]);
                 container.appendChild(card);
@@ -901,12 +916,13 @@
                     ${maps.map((m, idx) => `
                         <div class="map-item" data-map-index="${idx}">
                             <div class="map-checkbox">
-                                <input type="checkbox" 
-                                       id="${type}_map_${idx}" 
-                                       class="${type}-map-checkbox"
-                                       data-map-name="${m.map}"
-                                       checked 
-                                       onchange="updateMapSelection('${type}')">
+                                    <input type="checkbox" 
+                                        id="${type}_map_${idx}" 
+                                        class="map-checkbox-item"
+                                        data-map-type="${type}"
+                                        data-map-name="${m.map}"
+                                        checked 
+                                        onchange="updateMapSelection('${type}')">
                             </div>
                             <div class="map-info">
                                 <label for="${type}_map_${idx}" class="map-name" style="cursor: pointer;">${m.map}</label>
@@ -926,7 +942,7 @@
 
         function toggleAllMaps(type) {
             const selectAllCheckbox = document.getElementById(`${type}_selectAll`);
-            const mapCheckboxes = document.querySelectorAll(`.${type}-map-checkbox`);
+            const mapCheckboxes = document.querySelectorAll(`[data-map-type="${type}"]`);
             
             mapCheckboxes.forEach(checkbox => {
                 checkbox.checked = selectAllCheckbox.checked;
@@ -942,7 +958,7 @@
         }
 
         function updateMapSelection(type) {
-            const mapCheckboxes = document.querySelectorAll(`.${type}-map-checkbox`);
+            const mapCheckboxes = document.querySelectorAll(`[data-map-type="${type}"]`);
             const selectAllCheckbox = document.getElementById(`${type}_selectAll`);
             const statsElement = document.getElementById(`${type}_stats`);
             
@@ -973,7 +989,7 @@
         }
 
         function getSelectedMaps(type) {
-            const mapCheckboxes = document.querySelectorAll(`.${type}-map-checkbox`);
+            const mapCheckboxes = document.querySelectorAll(`[data-map-type="${type}"]`);
             const selectedMaps = [];
             const excludedMaps = [];
             
