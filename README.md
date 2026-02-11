@@ -6,6 +6,8 @@ Sitio oficial de CPMA: https://playmorepromode.com/
 
 Maked with love by https://yimgame.github.io/
 
+<img width="714" height="749" alt="q3_cpma_map_list_config_generator" src="https://github.com/user-attachments/assets/1b9cdca6-88b1-4f9c-9fd6-c544e8b6af72" />
+
 
 [![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)](https://www.python.org/)
 [![Flask](https://img.shields.io/badge/Flask-3.1.2-green.svg)](https://flask.palletsprojects.com/)
