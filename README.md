@@ -2,9 +2,9 @@
 
 > **Sistema Dinámico de Generación Automática** de archivos de configuración de mapas para Quake 3 Arena CPMA
 
-Sitio oficial de CPMA: https://playmorepromode.com/
+>_ 🌐 Sitio oficial de CPMA: https://playmorepromode.com/
 
-Maked with love by https://yimgame.github.io/
+>_ 🌐 Maked with love by https://yimgame.github.io/
 
 <img width="714" height="749" alt="q3_cpma_map_list_config_generator" src="https://github.com/user-attachments/assets/1b9cdca6-88b1-4f9c-9fd6-c544e8b6af72" />
 
