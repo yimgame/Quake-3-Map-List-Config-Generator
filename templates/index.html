@@ -252,6 +252,57 @@
             background: rgba(255, 102, 0, 0.2);
         }
 
+        .nextmap-opts {
+            display: grid;
+            gap: 6px;
+            margin: 10px 0;
+            padding: 10px 12px;
+            border: 1px dashed #ff6600;
+            border-radius: 8px;
+            font-size: 0.9em;
+        }
+
+        .nextmap-opts label {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            cursor: pointer;
+            margin: 0;
+            text-transform: none;
+            font-size: 0.95em;
+            color: #ddd;
+            text-align: left;
+        }
+
+        .nextmap-opts input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            flex: none;
+            margin: 0;
+            padding: 0;
+            accent-color: #ff6600;
+            cursor: pointer;
+        }
+
+        .nextmap-opts b {
+            color: #ff6600;
+        }
+
+        .btn-actual {
+            width: 100%;
+            margin-bottom: 10px;
+            font-size: 0.9em;
+            padding: 8px 12px;
+            background: #3a3a3a !important;
+            border: 1px solid #ff6600 !important;
+            color: #ffb37a !important;
+            box-shadow: none !important;
+        }
+
+        .btn-actual:hover {
+            background: #4a4a4a !important;
+        }
+
         .map-select-all input[type="checkbox"] {
             cursor: pointer;
             width: 18px;
@@ -579,11 +630,11 @@
                 <div class="config-form">
                     <div class="form-group">
                         <label for="baseq3Input">Ruta de Mapas (baseq3)</label>
-                        <input type="text" id="baseq3Input" placeholder="G:\Games\Quake3\baseq3">
+                        <input type="text" id="baseq3Input" placeholder="/quake3/baseq3  o  G:\Games\Quake3\baseq3">
                     </div>
                     <div class="form-group">
                         <label for="outputInput">Ruta de Salida (cfg-maps)</label>
-                        <input type="text" id="outputInput" placeholder="G:\Games\Quake3\cpma\cfg-maps">
+                        <input type="text" id="outputInput" placeholder="/quake3/cpma/cfg-maps  o  G:\Games\Quake3\cpma\cfg-maps">
                     </div>
                 </div>
                 <div class="config-buttons">
@@ -643,8 +694,8 @@
         }
 
         function resetConfig() {
-            document.getElementById('baseq3Input').value = 'G:\\Games\\Quake3\\baseq3';
-            document.getElementById('outputInput').value = 'G:\\Games\\Quake3\\cpma\\cfg-maps';
+            document.getElementById('baseq3Input').value = '/quake3/baseq3';
+            document.getElementById('outputInput').value = '/quake3/cpma/cfg-maps';
             showConfigMessage('Valores restaurados a los predeterminados', 'success');
         }
 
@@ -780,9 +831,9 @@
             const typeConfigs = {
                 'ffa': { minplayers: '00', maxplayers: '04', fraglimit: '25', timelimit: '20', label: 'FFA - Free For All' },
                 'ctf': { minplayers: '02', maxplayers: '12', caplimit: '05', timelimit: '05', label: 'CTF - Capture The Flag' },
-                'ctfs': { minplayers: '02', maxplayers: '12', caplimit: '05', timelimit: '05', label: 'CTFS - CTF Strawberry' },
+                'ctfs': { minplayers: '02', maxplayers: '12', caplimit: '05', timelimit: '05', label: 'CTFS - CTF Strike' },
                 'tourney': { minplayers: '00', maxplayers: '02', fraglimit: '20', timelimit: '10', label: 'Tourney - 1v1 Duel' },
-                '1v1': { minplayers: '00', maxplayers: '02', fraglimit: '20', timelimit: '10', label: '1v1 - Duel' },
+                '1v1': { minplayers: '00', maxplayers: '02', fraglimit: '20', timelimit: '10', label: '1v1 - Duel / Tourney' },
                 'team': { minplayers: '02', maxplayers: '16', fraglimit: '30', timelimit: '20', label: 'Team' },
                 'tdm': { minplayers: '02', maxplayers: '16', fraglimit: '30', timelimit: '20', label: 'TDM - Team Deathmatch' },
                 'ra': { minplayers: '02', maxplayers: '08', fraglimit: '25', timelimit: '15', label: 'RA - Rocket Arena' },
@@ -854,6 +905,9 @@
             }
         }
 
+        // tipo de mapa -> server CPMA que usa esa lista (para armar el vstr next/prev)
+        const SERVER_DE = { ctf: 'ctf', tdm: 'tdm', ffa: 'ffa', '1v1': '1v1', tourney: '1v1', '2v2': '2v2', ca: 'ca', ft: 'ft', ra3: 'ra3' };
+
         function createTypeCard(type, maps, defaultConfig, count) {
             const card = document.createElement('div');
             card.className = 'type-card';
@@ -900,6 +954,12 @@
                     ${extraFields}
                 </div>
 
+                ${SERVER_DE[type] ? `
+                <div class="nextmap-opts">
+                    <label for="${type}_nextmap"><input type="checkbox" id="${type}_nextmap" checked><span>Armar lista <b>next / prev</b> (vstr) para el server <b>${SERVER_DE[type].toUpperCase()}</b></span></label>
+                    <label for="${type}_aplicar"><input type="checkbox" id="${type}_aplicar" checked><span>Aplicarla en vivo, sin reiniciar el server</span></label>
+                </div>` : ''}
+
                 <div class="actions">
                     <button onclick="previewConfig('${type}')">👁️ Previsualizar</button>
                     <button onclick="generateConfig('${type}')">💾 Generar Archivo</button>
@@ -909,6 +969,8 @@
                 <div id="${type}_message" class="message"></div>
 
                 <div class="map-list">
+                    ${SERVER_DE[type] ? `<button class="secondary btn-actual" onclick="tildarActual('${type}')">☑ Tildar la lista actual del server ${SERVER_DE[type].toUpperCase()}</button>
+                    <div id="${type}_actual_msg" class="map-stats"></div>` : ''}
                     <div class="map-select-all">
                         <input type="checkbox" id="${type}_selectAll" checked onchange="toggleAllMaps('${type}')">
                         <label for="${type}_selectAll">Seleccionar/Deseleccionar todos</label>
@@ -938,6 +1000,23 @@
             `;
 
             return card;
+        }
+
+        async function tildarActual(type) {
+            const msg = document.getElementById(`${type}_actual_msg`);
+            try {
+                const d = await (await fetch(`/api/actual/${type}`)).json();
+                if (!d.success) throw new Error(d.error);
+                const actuales = new Set(d.mapas.map(m => m.toLowerCase()));
+                let tildados = 0;
+                document.querySelectorAll(`.map-checkbox-item[data-map-type="${type}"]`).forEach(cb => {
+                    cb.checked = actuales.has(cb.dataset.mapName.toLowerCase());
+                    if (cb.checked) tildados++;
+                });
+                updateMapSelection(type);
+                const faltan = d.mapas.length - [...actuales].filter(m => [...document.querySelectorAll(`.map-checkbox-item[data-map-type="${type}"]`)].some(cb => cb.dataset.mapName.toLowerCase() === m)).length;
+                msg.innerHTML = `La lista actual de <b>${d.server.toUpperCase()}</b> tiene ${d.mapas.length} mapas: tildé ${tildados}` + (faltan > 0 ? ` <span style="color:#ff6600">(${faltan} no aparecen en el escaneo)</span>` : '');
+            } catch (e) { msg.textContent = 'No pude leer la lista actual: ' + e.message; }
         }
 
         function toggleAllMaps(type) {
@@ -1021,6 +1100,10 @@
                 params.arena = document.getElementById(`${type}_arena`).value;
             }
 
+            const nm = document.getElementById(`${type}_nextmap`), ap = document.getElementById(`${type}_aplicar`);
+            params.nextmap = !!(nm && nm.checked);
+            params.aplicar = !!(ap && ap.checked);
+
             // Agregar mapas seleccionados y excluidos
             const mapSelection = getSelectedMaps(type);
             params.excluded_maps = mapSelection.excluded;
@@ -1067,9 +1150,16 @@
 
                 if (data.success) {
                     message.className = 'message success';
-                    message.textContent = `✅ Archivo generado: ${data.filename} (${data.maps_count} mapas)`;
+                    let txt = `✅ Archivo generado: ${data.filename} (${data.maps_count} mapas)`;
+                    (data.extra || []).forEach(x => { txt += `\n✅ ${x}`; });
+                    if (data.nextmap) {
+                        txt += `\n✅ next/prev: ${data.nextmap.archivo} (${data.nextmap.mapas} mapas)`;
+                        if (data.nextmap.vivo) txt += `\n🎮 ${data.nextmap.vivo}`;
+                    }
+                    message.textContent = txt;
+                    message.style.whiteSpace = 'pre-line';
                     message.style.display = 'block';
-                    setTimeout(() => { message.style.display = 'none'; }, 5000);
+                    setTimeout(() => { message.style.display = 'none'; }, 15000);
                 } else {
                     message.className = 'message error';
                     message.textContent = `❌ Error: ${data.error}`;

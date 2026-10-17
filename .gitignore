@@ -56,3 +56,7 @@ desktop.ini
 
 # Documentation backup
 *.md.bak
+
+# Generados por instalar.sh
+docker-compose.yml
+iniciar.sh

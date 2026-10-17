@@ -79,6 +79,43 @@
 - Útil si prefieres usar tu navegador favorito
 - **Archivos:** `app.py` o `run.bat` o `run_exe.bat`
 
+## Instalación rápida (instalador)
+
+| Sistema | Cómo | Qué hace |
+|---|---|---|
+| 🪟 Windows | doble clic en `instalar.bat` | Crea el entorno de Python (`q3cg`), instala dependencias y arma `config.json` con tu carpeta de Quake 3. Después: `run.bat` |
+| 🐧 Linux, Python | `bash instalar.sh` → opción **1** | Crea `.venv`, arma `config.json` y `iniciar.sh`. Opcional: servicio systemd que arranca solo |
+| 🐳 Linux, Docker | `bash instalar.sh` → opción **2** | Arma `config.json` y `docker-compose.yml` montando esta carpeta (un `git pull` + reinicio = actualizado) y lo levanta |
+
+El instalador pregunta la carpeta de Quake 3 (la que tiene `baseq3` y `cpma`) y la IP donde corren los servers
+(para aplicar las listas next/prev en vivo por rcon). Todo queda en `config.json`, que no se sube a git:
+
+```json
+{
+  "baseq3_path": "/opt/quake3/baseq3",
+  "output_path": "/opt/quake3/cpma/cfg-maps",
+  "ra3_path": "/opt/quake3/cpma/cfg-ra3",
+  "q3_host": "127.0.0.1"
+}
+```
+
+## 🔁 Listas next / prev (vstr) — v2.2
+
+Al **Generar** un modo con server propio (CTF, TDM, FFA, 1v1, 2v2, CA, FT, RA3) además se crea
+`cfg-maps/nextmap_<modo>.cfg` con la misma lista y orden, y (si tildás *Aplicarla en vivo*) se carga en el server por rcon:
+
+| Comando | Qué hace |
+|---|---|
+| `/rcon vstr next` (o `siguiente`, `nextmap`) | pasa al próximo mapa de la lista |
+| `/rcon vstr prev` (o `anterior`) | vuelve al anterior de la lista |
+| `/rcon vstr volver` | vuelve al mapa en el que estabas antes del último salto |
+| `/rcon vstr v7` | salta directo al mapa número 7 |
+| `/rcon actual` | muestra en qué mapa y número estás, ej. `basesiege[1/42]` |
+
+Para que el server la cargue al arrancar, agregá a su línea de comando `+exec cfg-maps/nextmap_<modo>.cfg`.
+Los mapas destildados salen al final del archivo de rotación con `minplayers -1` (baneados: no rotan ni se votan).
+Antes de pisar cualquier archivo se guarda una copia en `cfg-maps/_respaldo/`.
+
 ## Instalación y Uso
 
 ### Opción 1: Ejecutable con GUI (¡RECOMENDADO!)

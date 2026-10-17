@@ -10,6 +10,8 @@ import socket
 from pathlib import Path
 from flask import Flask, render_template, jsonify, request, send_file
 from collections import defaultdict
+from datetime import datetime
+import shutil
 
 app = Flask(__name__)
 
@@ -22,9 +24,9 @@ def load_config():
         with open(CONFIG_FILE, 'r') as f:
             return json.load(f)
     return {
-        'baseq3_path': r"G:\Games\Quake3\baseq3",
-        'output_path': r"G:\Games\Quake3\cpma\cfg-maps",
-        'ra3_path': r"G:\Games\Quake3\cpma\cfg-ra3"
+        'baseq3_path': "/quake3/baseq3",
+        'output_path': "/quake3/cpma/cfg-maps",
+        'ra3_path': "/quake3/cpma/cfg-ra3"
     }
 
 def save_config(config):
@@ -47,7 +49,7 @@ def get_lan_ip():
 config = load_config()
 BASEQ3_PATH = config.get('baseq3_path')
 OUTPUT_PATH = config.get('output_path')
-RA3_PATH = config.get('ra3_path', r"G:\Games\Quake3\cpma\cfg-ra3")
+RA3_PATH = config.get('ra3_path') or os.path.join(os.path.dirname(OUTPUT_PATH.rstrip('/\\')), 'cfg-ra3')
 
 class ArenaParser:
     """Parser para archivos .arena de Quake 3"""
@@ -112,19 +114,22 @@ class ArenaParser:
         # Clasificar por tipo
         self.maps_by_type.clear()
         # Lista completa de tipos soportados de CPMA
-        supported_types = ['ffa', 'team', 'tdm', 'tourney', '1v1', 'ctf', 'ra', 'ra3',
+        # 'team' no es un tipo aparte: se unifica dentro de 'tdm' (ver abajo)
+        supported_types = ['ffa', 'tdm', 'tourney', '1v1', 'ctf', 'ra', 'ra3',
                           'hm', 'da', 'ca', 'ft', 'ctfs', 'ntf', '2v2', 'ftag']
-        
+
+        # 'tourney' y '1v1' son lo mismo (duelo): van todos a '1v1'. 'team' va a 'tdm'. Sin repetir mapas por tipo.
+        alias = {'tourney': '1v1', 'team': 'tdm'}
+        vistos = defaultdict(set)
         for map_info in all_maps:
-            types = map_info.get('type', '').lower().split()
-            for type_name in types:
-                if type_name in supported_types:
-                    self.maps_by_type[type_name].append(map_info)
-                # Mapear variaciones
-                if type_name == 'tourney':
-                    self.maps_by_type['1v1'].append(map_info)
-                elif type_name == '1v1':
-                    self.maps_by_type['tourney'].append(map_info)
+            for type_name in map_info.get('type', '').lower().split():
+                tipo = alias.get(type_name, type_name)
+                nombre = map_info.get('map', '').lower()
+                if tipo in supported_types and nombre not in vistos[tipo]:
+                    vistos[tipo].add(nombre)
+                    self.maps_by_type[tipo].append(map_info)
+        for tipo in self.maps_by_type:
+            self.maps_by_type[tipo].sort(key=lambda m: m.get('map', '').lower())
         
         return all_maps
 
@@ -203,6 +208,9 @@ class ConfigGenerator:
             lines.append(line)
         
         return '\n'.join(lines)
+
+    @staticmethod
+    def generate_tourney_config(maps, default_params=None):
         """Genera configuración para mapas Tourney (1v1)"""
         if default_params is None:
             default_params = {
@@ -227,6 +235,135 @@ class ConfigGenerator:
 
 # Inicializar parser
 parser = ArenaParser()
+
+# ---------------------------------------------------------------- next/prev (vstr) por server
+# tipo del generador -> server CPMA (puerto rcon). La lista vstr se llama nextmap_<modo>.cfg y la ejecuta el server al arrancar.
+TIPO_A_SERVER = {'ctf': 'ctf', 'tdm': 'tdm', 'ffa': 'ffa', '1v1': '1v1', 'tourney': '1v1', '2v2': '2v2',
+                 'ca': 'ca', 'ft': 'ft', 'ra3': 'ra3'}
+PUERTOS = {"ctf": 27964, "tdm": 27963, "ft": 27966, "ra3": 27967, "2v2": 27962, "ca": 27965, "ffa": 27960, "1v1": 27961}
+# archivo de rotación que de verdad lee cada server (seta map "...") ademas del .txt
+ARCHIVO_SERVER = {'ctf': 'ctfmaps.cfg', 'tdm': 'tdmmaps.cfg'}
+# dónde corren los servers (para rcon): config.json "q3_host", o variable Q3_HOST, o esta misma máquina
+Q3_HOST = os.environ.get('Q3_HOST') or config.get('q3_host') or '127.0.0.1'
+QUAKE3 = os.path.dirname(os.path.dirname(OUTPUT_PATH.rstrip('/')))   # /quake3
+
+
+def seleccionar(maps, params):
+    """Mapas sin repetir (el mismo mapa puede venir en varios pk3) y sin los destildados, en el orden del escaneo."""
+    fuera = {m.lower() for m in (params or {}).get('excluded_maps', [])}
+    vistos, out = set(), []
+    for m in maps:
+        nombre = m.get('map', '')
+        if nombre and nombre.lower() not in vistos and nombre.lower() not in fuera:
+            vistos.add(nombre.lower())
+            out.append(m)
+    return sorted(out, key=lambda m: m.get('map', '').lower())   # alfabético: next/prev predecible
+
+
+def baneados(maps, params):
+    """Los mapas destildados (sin repetir, alfabético): van al archivo con minplayers -1 (convención CPMA)."""
+    fuera = {m.lower() for m in (params or {}).get('excluded_maps', [])}
+    return sorted({m.get('map', '') for m in maps if m.get('map', '').lower() in fuera}, key=str.lower)
+
+
+def agregar_baneados(contenido, nombres, params, map_type):
+    """Agrega al final los mapas excluidos con minplayers -1: no rotan y no se pueden votar aunque map_restrict sea 0."""
+    if not nombres:
+        return contenido
+    p = params or {}
+    limite = p.get('caplimit') or p.get('roundlimit') or p.get('fraglimit') or '00'
+    maxp, tiempo = p.get('maxplayers', '00'), p.get('timelimit', '00')
+    lineas = ['', '', '# excluidos desde el generador: minplayers -1 = "banned", no rotan ni se pueden votar']
+    for n in nombres:
+        if map_type == 'ra3':
+            lineas.append(f"{n}\t\t-1\t{maxp}\t{limite}\t{tiempo}\t{p.get('arena', '4')}")
+        else:
+            lineas.append(f"{n} -1 {maxp} {limite} {tiempo}")
+    return contenido + '\n'.join(lineas)
+
+
+def respaldar(ruta):
+    """Copia el archivo a cfg-maps/_respaldo/ antes de pisarlo."""
+    if os.path.exists(ruta):
+        dest = os.path.join(os.path.dirname(ruta), '_respaldo')
+        os.makedirs(dest, exist_ok=True)
+        shutil.copy2(ruta, os.path.join(dest, f"{os.path.basename(ruta)}.{datetime.now():%Y%m%d-%H%M%S}"))
+
+
+def cfg_server(modo):
+    try:
+        return open(os.path.join(QUAKE3, 'cpma', 'cfg', f'yimq3a-cpma-{modo}-server-gemini.cfg'), errors='replace').read()
+    except OSError:
+        return ''
+
+
+def generar_nextmap(modo, mapas):
+    """Misma lógica que scripts/generar_nextmap.py: vN, actual, siguiente/next/nextmap, anterior/prev, volver."""
+    n = len(mapas)
+    sig = lambda i: f"v{i % n + 1}"
+    ant = lambda i: f"v{(i - 2) % n + 1}"
+    out = [f"// Rotación manual (vstr chain) para {modo.upper()} -- {n} mapas, generado por el Map Config Generator {datetime.now():%Y-%m-%d %H:%M}",
+           "// /rcon vstr siguiente   (o next / nextmap)  -> pasa al próximo mapa de la lista",
+           "// /rcon actual                               -> en qué mapa y número estás, ej. basesiege[1/42]",
+           "// /rcon vstr v7                              -> salta directo al mapa número 7",
+           "// /rcon vstr volver                          -> vuelve al mapa de antes del último salto",
+           "// /rcon vstr anterior   (o prev)             -> el anterior en la lista", ""]
+    for i, mp in enumerate(mapas, 1):
+        out.append(f'set v{i} "vstr aca ; map {mp} ; set actual {mp}[{i}/{n}] ; set mapa_actual {mp} ; '
+                   f'set siguiente vstr {sig(i)} ; set next vstr {sig(i)} ; set nextmap vstr {sig(i)} ; '
+                   f'set anterior vstr {ant(i)} ; set prev vstr {ant(i)} ; set aca set volver vstr v{i}"')
+    m = re.search(r'^\s*map\s+(\S+)', cfg_server(modo), re.M)
+    ini = m.group(1) if m else None
+    i0 = next((k for k, x in enumerate(mapas, 1) if ini and x.lower() == ini.lower()), 0)
+    out += ["", f"// arranque: el server inicia en {ini or '?'}" + ("" if i0 else " (no está en la lista: el próximo es v1)"),
+            f'set actual "{ini}[{i0}/{n}]"' if i0 else f'set actual "{ini or "?"}"',
+            f'set mapa_actual "{ini or ""}"',
+            *[f'set {c} "vstr {sig(i0) if i0 else "v1"}"' for c in ("siguiente", "next", "nextmap")],
+            *[f'set {c} "vstr {ant(i0) if i0 else "v" + str(n)}"' for c in ("anterior", "prev")],
+            f'set aca "set volver vstr v{i0}"' if i0 else 'set aca ""',
+            f'set volver "vstr v{i0 if i0 else 1}"', ""]
+    ruta = os.path.join(OUTPUT_PATH, f'nextmap_{modo}.cfg')
+    respaldar(ruta)
+    with open(ruta, 'w', encoding='utf-8') as f:
+        f.write("\n".join(out))
+    return ruta
+
+
+def rcon(puerto, clave, comando):
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    s.settimeout(2)
+    try:
+        s.sendto(b"\xff\xff\xff\xffrcon " + clave.encode() + b" " + comando.encode(), (Q3_HOST, puerto))
+        return s.recvfrom(16384)[0][4:].decode(errors='replace')
+    except OSError:
+        return ''
+    finally:
+        s.close()
+
+
+def aplicar_en_vivo(modo, mapas):
+    """Carga la lista nueva en el server corriendo y alinea los alias con el mapa actual. Por rcon el ';' no separa
+    comandos, así que va un set por vez. El watcher después los mantiene al día en cada cambio de mapa."""
+    m = re.search(r'rconpassword\s+"([^"]+)"', cfg_server(modo))
+    if not m:
+        return 'sin rconpassword en el cfg del server'
+    clave, puerto = m.group(1), PUERTOS[modo]
+    if not rcon(puerto, clave, f"exec cfg-maps/nextmap_{modo}.cfg"):
+        return f'el server {modo} no respondió (¿apagado?)'
+    r = re.search(r'"mapname" is:"([^"^]+)', rcon(puerto, clave, "mapname"))
+    actual = r.group(1) if r else None
+    n = len(mapas)
+    idx = next((i for i, x in enumerate(mapas) if actual and x.lower() == actual.lower()), None)
+    if idx is None:
+        for c in (f"set actual {actual}[fuera_de_lista]", f"set mapa_actual {actual}"):
+            rcon(puerto, clave, c)
+        return f'aplicado; el server está en {actual}, que no está en la lista: next = v1'
+    sig, prev = f"v{(idx + 1) % n + 1}", f"v{(idx - 1) % n + 1}"
+    for c in (f"set actual {mapas[idx]}[{idx + 1}/{n}]", f"set mapa_actual {mapas[idx]}", f"set siguiente vstr {sig}",
+              f"set next vstr {sig}", f"set nextmap vstr {sig}", f"set anterior vstr {prev}", f"set prev vstr {prev}",
+              f"set aca set volver vstr v{idx + 1}"):
+        rcon(puerto, clave, c)
+    return f'aplicado en vivo: está en {mapas[idx]} [{idx + 1}/{n}], next = {mapas[(idx + 1) % n]}, prev = {mapas[(idx - 1) % n]}'
 
 @app.route('/')
 def index():
@@ -301,11 +438,7 @@ def update_config():
             }), 400
         
         # Guardar configuración
-        new_config = {
-            'baseq3_path': baseq3_path,
-            'output_path': output_path,
-            'ra3_path': ra3_path
-        }
+        new_config = dict(config, baseq3_path=baseq3_path, output_path=output_path, ra3_path=ra3_path)
         save_config(new_config)
         
         # Actualizar variables globales
@@ -326,6 +459,20 @@ def update_config():
             'error': str(e)
         }), 500
 
+@app.route('/api/actual/<map_type>')
+def lista_actual(map_type):
+    """Mapas de la lista vstr que hoy usa el server de ese tipo (para tildar lo mismo)."""
+    modo = TIPO_A_SERVER.get(map_type)
+    if not modo:
+        return jsonify({'success': False, 'error': 'Ese tipo no tiene server propio'}), 404
+    try:
+        txt = open(os.path.join(OUTPUT_PATH, f'nextmap_{modo}.cfg'), errors='replace').read()
+    except OSError:
+        return jsonify({'success': True, 'server': modo, 'mapas': []})
+    pares = sorted((int(a), b) for a, b in re.findall(r'^set v(\d+) "(?:vstr aca ; )?map (\S+)', txt, re.M))
+    return jsonify({'success': True, 'server': modo, 'mapas': [b for _, b in pares]})
+
+
 @app.route('/api/generate', methods=['POST'])
 def generate_configs():
     """Genera los archivos de configuración según los parámetros proporcionados"""
@@ -333,7 +480,9 @@ def generate_configs():
         data = request.json
         map_type = data.get('type')
         params = data.get('params', {})
-        maps = parser.maps_by_type.get(map_type, [])
+        maps = seleccionar(parser.maps_by_type.get(map_type, []), params)
+        if not maps:
+            return jsonify({'success': False, 'error': 'No hay mapas seleccionados (¿escaneaste primero?)'}), 400
         
         generator = ConfigGenerator()
         
@@ -372,12 +521,30 @@ def generate_configs():
             config_content = generator.generate_ffa_config(maps, params)
             filename = f'{map_type}maps.txt'
         
-        # Guardar archivo
+        config_content = agregar_baneados(config_content, baneados(parser.maps_by_type.get(map_type, []), params), params, map_type)
+
+        # Guardar archivo (con respaldo del anterior)
         output_file = os.path.join(OUTPUT_PATH, filename)
         os.makedirs(OUTPUT_PATH, exist_ok=True)
-        
+        respaldar(output_file)
         with open(output_file, 'w', encoding='utf-8') as f:
             f.write(config_content)
+        extra = []
+        # el server lee el .cfg (seta map "ctfmaps.cfg"), no el .txt
+        if map_type in ARCHIVO_SERVER:
+            ruta_srv = os.path.join(OUTPUT_PATH, ARCHIVO_SERVER[map_type])
+            respaldar(ruta_srv)
+            with open(ruta_srv, 'w', encoding='utf-8') as f:
+                f.write(config_content)
+            extra.append(f'rotación del server: {ARCHIVO_SERVER[map_type]}')
+        nextmap = None
+        modo = TIPO_A_SERVER.get(map_type)
+        if params.get('nextmap', True) and modo:
+            nombres = [m['map'] for m in maps]
+            generar_nextmap(modo, nombres)
+            nextmap = {'archivo': f'nextmap_{modo}.cfg', 'server': modo, 'mapas': len(nombres)}
+            if params.get('aplicar', True):
+                nextmap['vivo'] = aplicar_en_vivo(modo, nombres)
         
         # Para RA3, guardar también en cfg-ra3
         if map_type == 'ra3':
@@ -391,6 +558,8 @@ def generate_configs():
             'filename': filename,
             'path': output_file,
             'maps_count': len(maps),
+            'extra': extra,
+            'nextmap': nextmap,
             'preview': config_content[:500]
         })
     except Exception as e:
@@ -406,7 +575,7 @@ def preview_config():
         data = request.json
         map_type = data.get('type')
         params = data.get('params', {})
-        maps = parser.maps_by_type.get(map_type, [])
+        maps = seleccionar(parser.maps_by_type.get(map_type, []), params)
         
         generator = ConfigGenerator()
         
@@ -418,6 +587,7 @@ def preview_config():
             config_content = generator.generate_ra3_config(maps, params)
         else:
             config_content = generator.generate_ffa_config(maps, params)
+        config_content = agregar_baneados(config_content, baneados(parser.maps_by_type.get(map_type, []), params), params, map_type)
         
         return jsonify({
             'success': True,
@@ -458,4 +628,5 @@ if __name__ == '__main__':
     print(f"  💾 output: {OUTPUT_PATH}")
     print(f"  🎮 RA3:    {RA3_PATH}")
     print(f"{'='*70}\n")
-    app.run(debug=True, host='0.0.0.0', port=port)
+    # el modo debug de Flask permite ejecutar código desde el navegador: solo si se pide (Q3CG_DEBUG=1)
+    app.run(debug=os.environ.get('Q3CG_DEBUG') == '1', host='0.0.0.0', port=port)

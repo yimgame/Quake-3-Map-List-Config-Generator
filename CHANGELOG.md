@@ -1,5 +1,27 @@
 # Q3 Map Config Generator - Changelog
 
+## [v2.2] - 2026-10-17 - Next/Prev (vstr) por server, tipos unificados y exclusión real
+
+### ✨ Nuevas Características
+- **Lista next/prev (vstr) automática**: al generar, arma `cfg-maps/nextmap_<modo>.cfg` con la misma lista y orden
+  (`v1..vN`, `actual`, `siguiente`/`next`/`nextmap`, `anterior`/`prev`, `volver`)
+- **Aplicar en vivo**: carga la lista en el server corriendo por rcon (lee `rconpassword` del cfg del server) y alinea
+  los alias con el mapa actual, sin reiniciar. Host de los servers configurable con la variable `Q3_HOST`
+- **Tildar la lista actual del server**: marca los mismos mapas que ya usa el server, para partir de ahí
+- **Archivo que lee el server**: además del `.txt`, escribe `ctfmaps.cfg` / `tdmmaps.cfg` (los que usa `seta map`)
+- **Respaldo automático**: antes de pisar un archivo guarda copia en `cfg-maps/_respaldo/<archivo>.<fecha>`
+
+### 🐛 Correcciones
+- Los mapas destildados ahora sí se excluyen (antes se ignoraba `excluded_maps`) y salen al final con
+  `minplayers -1` (baneados, como decía la v2.1)
+- Sin mapas repetidos cuando el mismo mapa viene en varios `.pk3`
+- `tourney` y `1v1` unificados en una sola tarjeta "1v1 - Duel / Tourney"; `team` dentro de `tdm`
+- Orden alfabético de los mapas (next/prev predecible)
+- Rutas por defecto de Linux/Docker (`/quake3/...`), las del server
+
+### 🎨 UI
+- Opciones next/prev y "aplicar en vivo" en cada tarjeta, mensaje con el resultado (mapa actual, next y prev)
+
 ## [v2.1] - 2026-02-10 - Sistema de Exclusión de Mapas con Checkboxes
 
 ### ✨ Nuevas Características
